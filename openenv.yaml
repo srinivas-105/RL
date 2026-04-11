@@ -1,0 +1,50 @@
+name: CloudHealRL
+version: "1.0.0"
+description: >
+  Autonomous cloud cluster healing RL environment.
+  RL Agent decides all healing actions. Groq LLM beautifies explanations only.
+
+problem_type: reinforcement_learning
+domain: cloud_infrastructure_SRE
+
+tasks:
+  - id: 1
+    name: "Basic Healing"
+    difficulty: easy
+    description: "5 services, failures every 20 steps, no cascade"
+    max_steps: 200
+    pass_threshold: 0.60
+    observation_dim: 30
+    action_space: 21
+
+  - id: 2
+    name: "Cascade Prevention"
+    difficulty: medium
+    description: "5 services, failures every 12 steps, cascade enabled"
+    max_steps: 200
+    pass_threshold: 0.45
+
+  - id: 3
+    name: "Full Meltdown"
+    difficulty: hard
+    description: "5 services, failures every 7 steps, multi-fail + cascade"
+    max_steps: 200
+    pass_threshold: 0.30
+
+architecture:
+  rl_agent: PPO (stable-baselines3 / PyTorch)
+  llm: Groq (llama-3.3-70b-versatile)
+  llm_role: beautification_only
+  core_decisions: rl_agent_only
+
+server:
+  framework: FastAPI
+  entry: server/app.py
+  port: 7860
+  key_endpoint: POST /solve
+
+solve_flow:
+  1: Custom cluster state input
+  2: RL agent decides optimal action
+  3: Groq LLM explains in plain English
+  4: Response with action + explanation
