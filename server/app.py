@@ -37,12 +37,24 @@ from environment import (
 from agent import get_agent
 
 # ── Read env vars AFTER load_dotenv ──────────────────────────────────────────
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
-MODEL_NAME   = os.getenv("MODEL_NAME",   "llama-3.3-70b-versatile")
-HF_TOKEN     = os.getenv("HF_TOKEN",     "")
+# FIX: Use API_KEY and API_BASE_URL as primary (injected by hackathon evaluator)
+# Groq-specific vars kept as fallbacks for local dev
+API_BASE_URL = (
+    os.getenv("API_BASE_URL", "").strip()
+    or os.getenv("GROQ_API_BASE", "").strip()
+    or "https://api.groq.com/openai/v1"
+)
+API_KEY      = (
+    os.getenv("API_KEY", "").strip()
+    or os.getenv("GROQ_API_KEY", "").strip()
+    or os.getenv("HF_TOKEN", "").strip()
+)
+MODEL_NAME   = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
+HF_TOKEN     = os.getenv("HF_TOKEN", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
-print(f"[config] GROQ_API_KEY present: {bool(GROQ_API_KEY)}, length: {len(GROQ_API_KEY)}")
+print(f"[config] API_BASE_URL: {API_BASE_URL}")
+print(f"[config] API_KEY present: {bool(API_KEY)}, length: {len(API_KEY)}")
 print(f"[config] MODEL_NAME: {MODEL_NAME}")
 
 app = FastAPI(
@@ -100,27 +112,37 @@ def _load_agent():
         _agent = get_agent()
     return _agent
 
-# ── FIXED: Only reject truly empty or whitespace-only keys ───────────────────
+# ── FIX: Check API_KEY first (injected by hackathon evaluator), then fallbacks
 def _groq_available() -> bool:
     # Re-read at call time so any runtime changes are picked up
-    key = os.getenv("GROQ_API_KEY", "").strip()
+    key = (
+        os.getenv("API_KEY", "").strip()
+        or os.getenv("GROQ_API_KEY", "").strip()
+        or os.getenv("HF_TOKEN", "").strip()
+    )
     if not key:
-        # Also try HF_TOKEN as fallback
-        key = os.getenv("HF_TOKEN", "").strip()
-    # Only block if key is completely empty
-    if not key:
-        print("[groq] No API key found in environment")
+        print("[groq] No API key found in environment (checked API_KEY, GROQ_API_KEY, HF_TOKEN)")
         return False
     print(f"[groq] Key found, length={len(key)}, prefix={key[:7]}...")
     return True
 
+# ── FIX: Use API_BASE_URL first (injected by hackathon evaluator), then fallbacks
 def _groq_client():
     from openai import OpenAI
-    key = os.getenv("GROQ_API_KEY", "").strip()
-    if not key:
-        key = os.getenv("HF_TOKEN", "").strip()
-    base_url = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
-    model    = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
+    # Priority: API_KEY (hackathon) > GROQ_API_KEY > HF_TOKEN
+    key = (
+        os.getenv("API_KEY", "").strip()
+        or os.getenv("GROQ_API_KEY", "").strip()
+        or os.getenv("HF_TOKEN", "").strip()
+    )
+    # Priority: API_BASE_URL (hackathon) > GROQ_API_BASE > default Groq
+    base_url = (
+        os.getenv("API_BASE_URL", "").strip()
+        or os.getenv("GROQ_API_BASE", "").strip()
+        or "https://api.groq.com/openai/v1"
+    )
+    model = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
+    print(f"[groq_client] base_url={base_url}, model={model}, key_len={len(key)}")
     return OpenAI(api_key=key, base_url=base_url), model
 
 
@@ -191,7 +213,7 @@ def _parse_text_to_services(text: str) -> dict:
     )
     try:
         client, model = _groq_client()
-        print(f"[parse_text] Calling Groq model={model} ...")
+        print(f"[parse_text] Calling model={model} via base_url={os.getenv('API_BASE_URL','(default)')} ...")
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
@@ -251,8 +273,6 @@ def _keyword_parse(text: str) -> dict:
     for svc, aliases in service_aliases.items():
         for alias in aliases:
             if alias in text_lower:
-                # Determine severity
-                # Check surrounding context (±30 chars)
                 idx = text_lower.find(alias)
                 ctx = text_lower[max(0, idx-30):idx+len(alias)+30]
 
@@ -262,17 +282,15 @@ def _keyword_parse(text: str) -> dict:
                 if is_crash:
                     result[svc] = {"status": 2, "active_failure": 5}
                 elif is_degrade:
-                    # Pick best failure code from context
                     if "cpu" in ctx:            failure = 1
                     elif "memory" in ctx:       failure = 2
                     elif "deploy" in ctx:       failure = 3
                     elif "network" in ctx:      failure = 4
-                    else:                       failure = 3  # default bad_deploy
+                    else:                       failure = 3
                     result[svc] = {"status": 1, "active_failure": failure}
                 else:
-                    # Mentioned but no clear severity — mark as degraded
                     result[svc] = {"status": 1, "active_failure": 3}
-                break  # found this service, move to next
+                break
 
     print(f"[keyword_parse] Result: {result}")
     return result
@@ -1407,6 +1425,7 @@ def health():
         "episode_active":  _env is not None,
         "groq_configured": groq,
         "groq_model":      os.getenv("MODEL_NAME", "llama-3.3-70b-versatile") if groq else None,
+        "api_base_url":    os.getenv("API_BASE_URL", "(not set)"),
         "timestamp":       round(time.time(), 1),
     }
 
