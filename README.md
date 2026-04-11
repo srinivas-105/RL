@@ -5,7 +5,7 @@ colorFrom: cyan
 colorTo: green
 sdk: docker
 pinned: true
-license: mit
+license: MIT
 ---
 
 # ⚡ CloudHealRL — Autonomous Cloud Cluster Healing
@@ -128,53 +128,53 @@ score  = mean(reward across all steps)    # always in [0.0, 1.0]
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (1 Minute)
 
+### Local Dev (Venv Recommended)
 ```bash
-# Install
-pip install -r requirements.txt
+# Clone & venv (already done)
+python -m venv venv
+venv\Scripts\Activate.ps1  # or activate.bat on cmd
+pip install -U pip
+pip install gymnasium stable-baselines3[extra] torch fastapi uvicorn numpy matplotlib typer --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Smoke test
-python environment.py   # ✅ All tasks pass, all rewards in [0,1]
+# Smoke test ✅
+python inference.py  # TASK_1_SCORE: 0.96.., PASS: True
 
-# Run inference (hackathon evaluator entry point)
-python inference.py
-
-# Train PyTorch PPO (optional — heuristic scores 0.95+ already)
-python train.py                  # all 3 tasks, 100k steps each
-python train.py --task 2         # single task
-python train.py --quick          # 10k steps fast test
-
-# Start server with live simulation
+# Live demo ⚡
 python server/app.py
-# → http://localhost:7860           Landing page
-# → http://localhost:7860/simulation Live simulation ⚡
-# → http://localhost:7860/demo      Auto demo 🎬
-# → http://localhost:7860/solve-ui  Custom solver 🤖
+# Open: http://localhost:7860/simulation  (agent heals live)
+```
 
-# Docker
+### Docker (HF Spaces Ready)
+```bash
 docker build -t cloudhealrl .
 docker run -p 7860:7860 cloudhealrl
+# http://localhost:7860  — full UI + docs
 ```
+
+### Verify Scores (Evaluator)
+```bash
+python inference.py
+# Expected: OVERALL_SCORE: 0.95+ | PASS: True
+```
+
 
 ---
 
-## 🌐 API Endpoints
+## 🌐 API + UI (Self-Contained)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Landing page with full project overview |
-| `/simulation` | **GET** | **⚡ Live animated simulation — watch healing in real time** |
-| `/demo` | GET | 🎬 Self-contained: crash → heal → HTML report |
-| `/solve-ui` | GET | 🤖 Configure any state, get agent decision |
-| `/reset` | POST | `{"task": 1}` — start episode |
-| `/step` | POST | `{"action": null}` — agent decides |
-| `/inject` | POST | `{"scenario": "database_crash"}` |
-| `/state` | GET | Current cluster metrics |
-| `/action-log` | GET | Full agent history |
-| `/solve` | POST | Custom state → explanation |
-| `/health` | GET | Health check |
-| `/docs` | GET | Swagger UI |
+| Path | What it Does |
+|------|--------------|
+| `/` | 🚀 Landing + badges + live scores |
+| `/simulation` | ⚡ **Animated cluster** — watch RL heal live (glowing nodes/particles) |
+| `/demo` | 🎬 **1-click demo**: DB crash → heal → report |
+| `/solve-ui` | 🤖 **NL solver**: "DB down" → RL plan + Groq explain |
+| `/docs` | 📖 Interactive API docs |
+| `/solve` (POST) | **Core AI**: Text/state → RL triage → LLM explain |
+
+**curl /demo** for instant HTML report.
+
 
 ### One-command judge demo:
 ```bash
@@ -215,7 +215,8 @@ CloudHealRL/
 ├── models/             # PPO weights (cloudheal_ppo.zip) — push after training
 ├── openenv.yaml        # OpenEnv specification
 ├── Dockerfile          # HuggingFace Spaces deployment
-└── requirements.txt
+**Core Deps** (already installed): `gymnasium stable-baselines3[extra] torch fastapi uvicorn numpy matplotlib typer`
+
 ```
 
 ---
