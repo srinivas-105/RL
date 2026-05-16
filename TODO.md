@@ -6,7 +6,7 @@
 3. [x] Upgrade pip: `pip install -U pip` (minor update available, deps install fine)
 4. [x] Install dependencies: `pip install gymnasium stable-baselines3[extra] torch fastapi uvicorn numpy matplotlib typer --extra-index-url https://download.pytorch.org/whl/cpu` (matches README)
 5. [ ] Verify installation: `python inference.py`
-""""
+
 ## Follow-up:
 - Run server: `python server/app.py`
 - Test UI: http://localhost:7860
